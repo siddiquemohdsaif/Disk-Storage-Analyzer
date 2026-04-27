@@ -1,0 +1,20 @@
+{
+  "name": "disk-storage-analyser",
+  "version": "1.0.0",
+  "description": "A desktop UI for finding large files and folders on disk.",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "disk",
+    "storage",
+    "analyser",
+    "electron"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^41.3.0"
+  }
+}

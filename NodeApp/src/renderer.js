@@ -1,0 +1,520 @@
+const elements = {
+  selectPath: document.querySelector('#selectPath'),
+  rescan: document.querySelector('#rescan'),
+  refreshList: document.querySelector('#refreshList'),
+  cancelScan: document.querySelector('#cancelScan'),
+  minFileSize: document.querySelector('#minFileSize'),
+  fileSizeUnit: document.querySelector('#fileSizeUnit'),
+  minFolderSize: document.querySelector('#minFolderSize'),
+  folderSizeUnit: document.querySelector('#folderSizeUnit'),
+  selectedPath: document.querySelector('#selectedPath'),
+  totalSize: document.querySelector('#totalSize'),
+  fileCount: document.querySelector('#fileCount'),
+  folderCount: document.querySelector('#folderCount'),
+  skippedCount: document.querySelector('#skippedCount'),
+  foldersBody: document.querySelector('#foldersBody'),
+  filesBody: document.querySelector('#filesBody'),
+  folderSummary: document.querySelector('#folderSummary'),
+  fileSummary: document.querySelector('#fileSummary'),
+  foldersPanel: document.querySelector('#foldersPanel'),
+  filesPanel: document.querySelector('#filesPanel'),
+  panelResizer: document.querySelector('#panelResizer'),
+  nestedFolderView: document.querySelector('#nestedFolderView'),
+  flatFolderView: document.querySelector('#flatFolderView'),
+  progressPanel: document.querySelector('#progressPanel'),
+  progressCounts: document.querySelector('#progressCounts'),
+  progressPath: document.querySelector('#progressPath'),
+  notice: document.querySelector('#notice')
+};
+
+let currentPath = null;
+let currentResults = null;
+let isScanning = false;
+let folderViewMode = 'nested';
+let expandedFolderPaths = new Set();
+
+function sizeToBytes(input, unitSelect) {
+  const value = Math.max(0, Number(input.value) || 0);
+  const unit = unitSelect.value;
+  return value * (unit === 'GB' ? 1024 ** 3 : 1024 ** 2);
+}
+
+function minimumFileBytes() {
+  return sizeToBytes(elements.minFileSize, elements.fileSizeUnit);
+}
+
+function minimumFolderBytes() {
+  return sizeToBytes(elements.minFolderSize, elements.folderSizeUnit);
+}
+
+function formatBytes(bytes) {
+  if (!bytes) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** index;
+  return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function normalizePath(value) {
+  return value.replace(/[\\/]+/g, '\\').replace(/\\+$/, '').toLowerCase();
+}
+
+function isInsidePath(childPath, parentPath) {
+  const parent = normalizePath(parentPath);
+  const child = normalizePath(childPath);
+  return child === parent || child.startsWith(`${parent}\\`);
+}
+
+function parentPath(value) {
+  const normalized = value.replace(/[\\/]+/g, '\\').replace(/\\+$/, '');
+  const driveRoot = /^[a-zA-Z]:$/.test(normalized);
+  if (driveRoot) {
+    return '';
+  }
+
+  const index = normalized.lastIndexOf('\\');
+  if (index < 0) {
+    return '';
+  }
+
+  if (index === 2 && normalized[1] === ':') {
+    return `${normalized.slice(0, 2)}\\`;
+  }
+
+  return normalized.slice(0, index);
+}
+
+function setNotice(message, type = 'info') {
+  if (!message) {
+    elements.notice.className = 'notice hidden';
+    elements.notice.textContent = '';
+    return;
+  }
+
+  elements.notice.className = `notice ${type}`;
+  elements.notice.textContent = message;
+}
+
+function setScanning(scanning) {
+  isScanning = scanning;
+  elements.selectPath.disabled = scanning;
+  elements.rescan.disabled = scanning || !currentPath;
+  elements.refreshList.disabled = scanning || !currentResults;
+  elements.cancelScan.disabled = !scanning;
+  elements.minFileSize.disabled = scanning;
+  elements.fileSizeUnit.disabled = scanning;
+  elements.minFolderSize.disabled = scanning;
+  elements.folderSizeUnit.disabled = scanning;
+  elements.progressPanel.classList.toggle('hidden', !scanning);
+}
+
+function renderEmpty(tbody, message) {
+  tbody.innerHTML = '';
+  const row = document.createElement('tr');
+  const cell = document.createElement('td');
+  cell.colSpan = 4;
+  cell.className = 'empty';
+  cell.textContent = message;
+  row.append(cell);
+  tbody.append(row);
+}
+
+function createFolderTree(folders) {
+  const nodes = folders.map((item) => ({ ...item, children: [] }));
+  const byPath = new Map(nodes.map((node) => [normalizePath(node.path), node]));
+  const roots = [];
+
+  for (const node of nodes) {
+    const parent = byPath.get(normalizePath(parentPath(node.path)));
+    if (parent && parent.path !== node.path) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  const sortNodes = (items) => {
+    items.sort((a, b) => b.size - a.size);
+    for (const item of items) {
+      sortNodes(item.children);
+    }
+  };
+
+  sortNodes(roots);
+  return roots;
+}
+
+function createActionButton(label, className, onClick) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `icon-button ${className}`;
+  button.textContent = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+function appendItemRow(fragment, item, options = {}) {
+  const row = document.createElement('tr');
+
+  const name = document.createElement('td');
+  name.className = options.isTree ? 'name-cell tree-name-cell' : 'name-cell';
+
+  if (options.isTree) {
+    const treeContent = document.createElement('div');
+    treeContent.className = 'tree-name';
+    treeContent.style.setProperty('--depth', String(options.depth || 0));
+
+    const hasChildren = item.children && item.children.length > 0;
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = hasChildren ? 'tree-toggle' : 'tree-toggle placeholder';
+    toggle.textContent = hasChildren && expandedFolderPaths.has(item.path) ? 'v' : '>';
+    toggle.disabled = !hasChildren;
+    toggle.title = hasChildren ? 'Expand folder' : '';
+    toggle.addEventListener('click', () => {
+      if (expandedFolderPaths.has(item.path)) {
+        expandedFolderPaths.delete(item.path);
+      } else {
+        expandedFolderPaths.add(item.path);
+      }
+      renderFolders(currentResults);
+    });
+
+    const label = document.createElement('span');
+    label.textContent = item.name;
+    treeContent.append(toggle, label);
+    name.append(treeContent);
+  } else {
+    name.textContent = item.name;
+  }
+
+  const size = document.createElement('td');
+  size.className = 'size-cell';
+  size.textContent = formatBytes(item.size);
+
+  const itemPath = document.createElement('td');
+  itemPath.className = 'path-cell';
+  itemPath.title = item.path;
+  itemPath.textContent = item.path;
+
+  const actions = document.createElement('td');
+  actions.className = 'actions-cell';
+  actions.append(
+    createActionButton('Open', 'open', async () => {
+      try {
+        await window.diskAnalyser.showItem(item.path);
+      } catch (error) {
+        setNotice(error.message, 'error');
+      }
+    })
+  );
+
+  if (!item.isRoot) {
+    actions.append(
+      createActionButton('Delete', 'delete', async () => {
+        const confirmed = window.confirm(`Move this ${item.type} to the Recycle Bin?\n\n${item.path}`);
+        if (!confirmed) {
+          return;
+        }
+
+        try {
+          await window.diskAnalyser.deleteItem(item.path);
+          removeItem(item);
+          setNotice(`Moved to Recycle Bin: ${item.path}`, 'success');
+        } catch (error) {
+          setNotice(error.message, 'error');
+        }
+      })
+    );
+  }
+
+  row.append(name, size, itemPath, actions);
+  fragment.append(row);
+}
+
+function renderTable(tbody, items, emptyMessage) {
+  tbody.innerHTML = '';
+
+  if (!items.length) {
+    renderEmpty(tbody, emptyMessage);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  for (const item of items) {
+    appendItemRow(fragment, item);
+  }
+
+  tbody.append(fragment);
+}
+
+function renderNestedFolders(items) {
+  elements.foldersBody.innerHTML = '';
+
+  if (!items.length) {
+    renderEmpty(elements.foldersBody, 'No folders meet the minimum size.');
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  const appendNode = (node, depth) => {
+    appendItemRow(fragment, node, { isTree: true, depth });
+
+    if (expandedFolderPaths.has(node.path)) {
+      for (const child of node.children) {
+        appendNode(child, depth + 1);
+      }
+    }
+  };
+
+  for (const item of createFolderTree(items)) {
+    appendNode(item, 0);
+  }
+
+  elements.foldersBody.append(fragment);
+}
+
+function renderFolders(results) {
+  if (!results) {
+    renderEmpty(elements.foldersBody, 'Select a path to scan.');
+    return;
+  }
+
+  elements.nestedFolderView.classList.toggle('active', folderViewMode === 'nested');
+  elements.flatFolderView.classList.toggle('active', folderViewMode === 'flat');
+
+  if (folderViewMode === 'nested') {
+    renderNestedFolders(results.folders);
+  } else {
+    renderTable(elements.foldersBody, results.folders, 'No folders meet the minimum size.');
+  }
+}
+
+function removeItem(item) {
+  if (!currentResults) {
+    return;
+  }
+
+  const collection = item.type === 'folder' ? currentResults.folders : currentResults.files;
+  const index = collection.findIndex((candidate) => candidate.path === item.path);
+  if (index >= 0) {
+    collection.splice(index, 1);
+  }
+
+  if (item.type === 'folder') {
+    currentResults.folders = currentResults.folders.filter((candidate) => !isInsidePath(candidate.path, item.path));
+    currentResults.files = currentResults.files.filter((candidate) => !isInsidePath(candidate.path, item.path));
+    expandedFolderPaths.delete(item.path);
+  }
+
+  renderResults(currentResults);
+}
+
+function renderResults(results) {
+  currentResults = results;
+
+  elements.totalSize.textContent = formatBytes(results.rootSize);
+  elements.fileCount.textContent = results.files.length.toLocaleString();
+  elements.folderCount.textContent = results.folders.length.toLocaleString();
+  elements.skippedCount.textContent = results.totals.skipped.toLocaleString();
+  elements.folderSummary.textContent = `${results.folders.length.toLocaleString()} folders at or above minimum size`;
+  elements.fileSummary.textContent = `${results.files.length.toLocaleString()} files at or above minimum size`;
+
+  renderFolders(results);
+  renderTable(elements.filesBody, results.files, 'No files meet the minimum size.');
+  elements.refreshList.disabled = isScanning || !currentResults;
+
+  if (results.totals.errors.length) {
+    setNotice(`Scan finished. Some protected or inaccessible items were skipped (${results.totals.errors.length} shown internally).`, 'warning');
+  } else {
+    setNotice('Scan finished successfully.', 'success');
+  }
+}
+
+function pruneMissingItems(missingPaths) {
+  const missing = new Set(missingPaths.map(normalizePath));
+  const missingFolders = currentResults.folders.filter((folder) => missing.has(normalizePath(folder.path)));
+  const isMissingOrInsideMissingFolder = (item) => {
+    const normalized = normalizePath(item.path);
+    if (missing.has(normalized)) {
+      return true;
+    }
+
+    return missingFolders.some((folder) => item.path !== folder.path && isInsidePath(item.path, folder.path));
+  };
+
+  currentResults.folders = currentResults.folders.filter((item) => !isMissingOrInsideMissingFolder(item));
+  currentResults.files = currentResults.files.filter((item) => !isMissingOrInsideMissingFolder(item));
+
+  for (const missingPath of missingPaths) {
+    expandedFolderPaths.delete(missingPath);
+  }
+}
+
+async function refreshCurrentList() {
+  if (!currentResults || isScanning) {
+    return;
+  }
+
+  elements.refreshList.disabled = true;
+  setNotice('Refreshing current list...', 'info');
+
+  try {
+    const items = [...currentResults.folders, ...currentResults.files].map((item) => ({
+      path: item.path,
+      type: item.type
+    }));
+    const validation = await window.diskAnalyser.validateItems(items);
+    const missingPaths = validation.filter((item) => !item.exists).map((item) => item.path);
+
+    if (!missingPaths.length) {
+      renderResults(currentResults);
+      setNotice('Refresh complete. No deleted items found.', 'success');
+      return;
+    }
+
+    pruneMissingItems(missingPaths);
+    renderResults(currentResults);
+    setNotice(`Refresh complete. Removed ${missingPaths.length.toLocaleString()} deleted item(s) from the list.`, 'success');
+  } catch (error) {
+    setNotice(error.message, 'error');
+  } finally {
+    elements.refreshList.disabled = isScanning || !currentResults;
+  }
+}
+
+function renderProgress(progress) {
+  elements.progressCounts.textContent = [
+    `${progress.scannedFiles.toLocaleString()} files scanned`,
+    `${progress.scannedFolders.toLocaleString()} folders scanned`,
+    `${progress.matchedFiles.toLocaleString()} files matched`,
+    `${progress.matchedFolders.toLocaleString()} folders matched`,
+    `${progress.skipped.toLocaleString()} skipped`
+  ].join(' | ');
+  elements.progressPath.textContent = progress.currentPath || 'Scanning...';
+  elements.progressPath.title = progress.currentPath || '';
+}
+
+async function scanSelectedPath() {
+  if (!currentPath || isScanning) {
+    return;
+  }
+
+  setScanning(true);
+  setNotice('Scanning. Large drives can take a while, especially from C:\\.', 'info');
+  elements.totalSize.textContent = 'Scanning...';
+  elements.fileCount.textContent = '-';
+  elements.folderCount.textContent = '-';
+  elements.skippedCount.textContent = '-';
+  renderEmpty(elements.foldersBody, 'Scanning folders...');
+  renderEmpty(elements.filesBody, 'Scanning files...');
+  renderProgress({
+    currentPath,
+    scannedFiles: 0,
+    scannedFolders: 0,
+    skipped: 0,
+    matchedFiles: 0,
+    matchedFolders: 0
+  });
+
+  try {
+    const results = await window.diskAnalyser.scanPath({
+      rootPath: currentPath,
+      minFileBytes: minimumFileBytes(),
+      minFolderBytes: minimumFolderBytes()
+    });
+    expandedFolderPaths = new Set([results.rootPath]);
+    renderResults(results);
+  } catch (error) {
+    if (error.message === 'Scan cancelled.') {
+      setNotice('Scan cancelled.', 'warning');
+    } else {
+      setNotice(error.message, 'error');
+    }
+  } finally {
+    setScanning(false);
+  }
+}
+
+async function selectAndScan() {
+  try {
+    const selectedPath = await window.diskAnalyser.selectPath();
+    if (!selectedPath) {
+      return;
+    }
+
+    currentPath = selectedPath;
+    elements.selectedPath.textContent = selectedPath;
+    elements.rescan.disabled = false;
+    elements.refreshList.disabled = true;
+    await scanSelectedPath();
+  } catch (error) {
+    setNotice(error.message, 'error');
+    setScanning(false);
+  }
+}
+
+elements.selectPath.addEventListener('click', selectAndScan);
+elements.rescan.addEventListener('click', scanSelectedPath);
+elements.refreshList.addEventListener('click', refreshCurrentList);
+elements.cancelScan.addEventListener('click', async () => {
+  await window.diskAnalyser.cancelScan();
+  setScanning(false);
+  setNotice('Cancelling scan...', 'warning');
+});
+
+elements.nestedFolderView.addEventListener('click', () => {
+  folderViewMode = 'nested';
+  renderFolders(currentResults);
+});
+
+elements.flatFolderView.addEventListener('click', () => {
+  folderViewMode = 'flat';
+  renderFolders(currentResults);
+});
+
+function resetPanelSizes() {
+  elements.foldersPanel.style.flex = '1 1 0';
+  elements.filesPanel.style.flex = '1 1 0';
+}
+
+elements.panelResizer.addEventListener('dblclick', resetPanelSizes);
+elements.panelResizer.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  const container = elements.panelResizer.parentElement;
+  const startY = event.clientY;
+  const folderStart = elements.foldersPanel.getBoundingClientRect().height;
+  const fileStart = elements.filesPanel.getBoundingClientRect().height;
+  const total = folderStart + fileStart;
+  const minPanelHeight = 170;
+
+  elements.panelResizer.setPointerCapture(event.pointerId);
+
+  const onPointerMove = (moveEvent) => {
+    const delta = moveEvent.clientY - startY;
+    const folderHeight = Math.max(minPanelHeight, Math.min(total - minPanelHeight, folderStart + delta));
+    const fileHeight = total - folderHeight;
+    elements.foldersPanel.style.flex = `0 0 ${folderHeight}px`;
+    elements.filesPanel.style.flex = `0 0 ${fileHeight}px`;
+  };
+
+  const onPointerUp = () => {
+    container.removeEventListener('pointermove', onPointerMove);
+    container.removeEventListener('pointerup', onPointerUp);
+  };
+
+  container.addEventListener('pointermove', onPointerMove);
+  container.addEventListener('pointerup', onPointerUp);
+});
+
+window.diskAnalyser.onScanProgress(renderProgress);
+
+window.addEventListener('DOMContentLoaded', () => {
+  renderEmpty(elements.foldersBody, 'Select a path to scan.');
+  renderEmpty(elements.filesBody, 'Select a path to scan.');
+  setTimeout(selectAndScan, 350);
+});

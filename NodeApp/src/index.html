@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Disk Storage Analyser</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <h1>Disk Storage Analyser</h1>
+          <p id="selectedPath">Choose a drive or folder to scan.</p>
+        </div>
+        <div class="toolbar">
+          <label class="field">
+            <span>Files minimum</span>
+            <div class="size-input">
+              <input id="minFileSize" type="number" min="0" step="1" value="10" />
+              <select id="fileSizeUnit" aria-label="Files minimum size unit">
+                <option value="MB" selected>MB</option>
+                <option value="GB">GB</option>
+              </select>
+            </div>
+          </label>
+          <label class="field">
+            <span>Folders minimum</span>
+            <div class="size-input">
+              <input id="minFolderSize" type="number" min="0" step="1" value="500" />
+              <select id="folderSizeUnit" aria-label="Folders minimum size unit">
+                <option value="MB" selected>MB</option>
+                <option value="GB">GB</option>
+              </select>
+            </div>
+          </label>
+          <button id="selectPath" class="button primary">Select Path</button>
+          <button id="rescan" class="button" disabled>Scan</button>
+          <button id="refreshList" class="button" disabled>Refresh</button>
+          <button id="cancelScan" class="button danger" disabled>Cancel</button>
+        </div>
+      </header>
+
+      <section class="status-grid">
+        <div class="metric">
+          <span>Total size</span>
+          <strong id="totalSize">-</strong>
+        </div>
+        <div class="metric">
+          <span>Files found</span>
+          <strong id="fileCount">-</strong>
+        </div>
+        <div class="metric">
+          <span>Folders found</span>
+          <strong id="folderCount">-</strong>
+        </div>
+        <div class="metric">
+          <span>Skipped</span>
+          <strong id="skippedCount">-</strong>
+        </div>
+      </section>
+
+      <section id="notice" class="notice hidden"></section>
+
+      <section id="progressPanel" class="progress-panel hidden" aria-live="polite">
+        <div class="progress-heading">
+          <strong>Scanning</strong>
+          <span id="progressCounts">0 files, 0 folders scanned</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar"></div>
+        </div>
+        <p id="progressPath">Preparing scan...</p>
+      </section>
+
+      <section class="tables">
+        <article id="foldersPanel" class="panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Folders</h2>
+              <span id="folderSummary">Sorted by size</span>
+            </div>
+            <div class="panel-tools" aria-label="Folder view mode">
+              <button id="nestedFolderView" class="mode-button active" type="button">Nested</button>
+              <button id="flatFolderView" class="mode-button" type="button">Flat</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>Path</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="foldersBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <div id="panelResizer" class="panel-resizer" title="Drag to resize panels. Double-click to auto fit."></div>
+
+        <article id="filesPanel" class="panel">
+          <div class="panel-heading">
+            <h2>Files</h2>
+            <span id="fileSummary">Sorted by size</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Size</th>
+                  <th>Path</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="filesBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

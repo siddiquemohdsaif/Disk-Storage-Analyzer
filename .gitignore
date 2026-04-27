@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+NodeApp/node_modules/
+
+# Electron and app build output
+dist/
+out/
+build/
+release/
+*.asar
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime and cache files
+.cache/
+.parcel-cache/
+.vite/
+coverage/
+tmp/
+temp/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
