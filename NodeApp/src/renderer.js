@@ -2,6 +2,7 @@ const elements = {
   selectPath: document.querySelector('#selectPath'),
   rescan: document.querySelector('#rescan'),
   refreshList: document.querySelector('#refreshList'),
+  themeToggle: document.querySelector('#themeToggle'),
   cancelScan: document.querySelector('#cancelScan'),
   minFileSize: document.querySelector('#minFileSize'),
   fileSizeUnit: document.querySelector('#fileSizeUnit'),
@@ -19,6 +20,10 @@ const elements = {
   foldersPanel: document.querySelector('#foldersPanel'),
   filesPanel: document.querySelector('#filesPanel'),
   panelResizer: document.querySelector('#panelResizer'),
+  folderSortSize: document.querySelector('#folderSortSize'),
+  folderSortCreated: document.querySelector('#folderSortCreated'),
+  fileSortSize: document.querySelector('#fileSortSize'),
+  fileSortCreated: document.querySelector('#fileSortCreated'),
   nestedFolderView: document.querySelector('#nestedFolderView'),
   flatFolderView: document.querySelector('#flatFolderView'),
   progressPanel: document.querySelector('#progressPanel'),
@@ -31,7 +36,64 @@ let currentPath = null;
 let currentResults = null;
 let isScanning = false;
 let folderViewMode = 'nested';
+let folderSortMode = 'size';
+let fileSortMode = 'size';
 let expandedFolderPaths = new Set();
+
+const iconPaths = {
+  folderOpen: '<path d="M6 14h13l-2 5H4l2-5Z"></path><path d="M3 6h6l2 2h10v4H6l-3 7V6Z"></path>',
+  scan: '<path d="M4 7V5a1 1 0 0 1 1-1h2"></path><path d="M17 4h2a1 1 0 0 1 1 1v2"></path><path d="M20 17v2a1 1 0 0 1-1 1h-2"></path><path d="M7 20H5a1 1 0 0 1-1-1v-2"></path><path d="M7 12h10"></path>',
+  refresh: '<path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 5v4h4"></path><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"></path>',
+  stop: '<path d="M6 6h12v12H6z"></path>',
+  sun: '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path>',
+  moon: '<path d="M20.8 13.3A8.5 8.5 0 0 1 10.7 3.2a7 7 0 1 0 10.1 10.1Z"></path>',
+  chevron: '<path d="m9 18 6-6-6-6"></path>',
+  folder: '<path d="M3 6h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Z"></path>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6"></path>',
+  external: '<path d="M15 3h6v6"></path><path d="m10 14 11-11"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>',
+  trash: '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path>'
+};
+
+function createIcon(name) {
+  const span = document.createElement('span');
+  span.className = 'icon';
+  span.setAttribute('aria-hidden', 'true');
+  span.innerHTML = `<svg viewBox="0 0 24 24">${iconPaths[name]}</svg>`;
+  return span;
+}
+
+function setButtonContent(button, iconName, label) {
+  button.textContent = '';
+  button.append(createIcon(iconName));
+
+  if (label) {
+    const text = document.createElement('span');
+    text.textContent = label;
+    button.append(text);
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem('diskAnalyserTheme', theme);
+  const isDark = theme === 'dark';
+  elements.themeToggle.title = isDark ? 'Switch to light mode' : 'Switch to dark mode';
+  elements.themeToggle.setAttribute('aria-label', elements.themeToggle.title);
+  setButtonContent(elements.themeToggle, isDark ? 'sun' : 'moon', '');
+}
+
+function initializeTheme() {
+  const savedTheme = localStorage.getItem('diskAnalyserTheme');
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  applyTheme(savedTheme || systemTheme);
+}
+
+function initializeButtonIcons() {
+  setButtonContent(elements.selectPath, 'folderOpen', 'Select Path');
+  setButtonContent(elements.rescan, 'scan', 'Scan');
+  setButtonContent(elements.refreshList, 'refresh', 'Refresh');
+  setButtonContent(elements.cancelScan, 'stop', 'Cancel');
+}
 
 function sizeToBytes(input, unitSelect) {
   const value = Math.max(0, Number(input.value) || 0);
@@ -56,6 +118,20 @@ function formatBytes(bytes) {
   const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / 1024 ** index;
   return `${value.toFixed(value >= 10 || index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+function sortItems(items, sortMode) {
+  const sorted = [...items];
+
+  sorted.sort((a, b) => {
+    if (sortMode === 'created') {
+      return (b.createdAt || 0) - (a.createdAt || 0) || b.size - a.size;
+    }
+
+    return b.size - a.size || (b.createdAt || 0) - (a.createdAt || 0);
+  });
+
+  return sorted;
 }
 
 function normalizePath(value) {
@@ -104,10 +180,6 @@ function setScanning(scanning) {
   elements.rescan.disabled = scanning || !currentPath;
   elements.refreshList.disabled = scanning || !currentResults;
   elements.cancelScan.disabled = !scanning;
-  elements.minFileSize.disabled = scanning;
-  elements.fileSizeUnit.disabled = scanning;
-  elements.minFolderSize.disabled = scanning;
-  elements.folderSizeUnit.disabled = scanning;
   elements.progressPanel.classList.toggle('hidden', !scanning);
 }
 
@@ -122,7 +194,7 @@ function renderEmpty(tbody, message) {
   tbody.append(row);
 }
 
-function createFolderTree(folders) {
+function createFolderTree(folders, sortMode) {
   const nodes = folders.map((item) => ({ ...item, children: [] }));
   const byPath = new Map(nodes.map((node) => [normalizePath(node.path), node]));
   const roots = [];
@@ -137,7 +209,13 @@ function createFolderTree(folders) {
   }
 
   const sortNodes = (items) => {
-    items.sort((a, b) => b.size - a.size);
+    items.sort((a, b) => {
+      if (sortMode === 'created') {
+        return (b.createdAt || 0) - (a.createdAt || 0) || b.size - a.size;
+      }
+
+      return b.size - a.size || (b.createdAt || 0) - (a.createdAt || 0);
+    });
     for (const item of items) {
       sortNodes(item.children);
     }
@@ -147,11 +225,11 @@ function createFolderTree(folders) {
   return roots;
 }
 
-function createActionButton(label, className, onClick) {
+function createActionButton(label, className, iconName, onClick) {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = `icon-button ${className}`;
-  button.textContent = label;
+  setButtonContent(button, iconName, label);
   button.addEventListener('click', onClick);
   return button;
 }
@@ -168,12 +246,15 @@ function appendItemRow(fragment, item, options = {}) {
     treeContent.style.setProperty('--depth', String(options.depth || 0));
 
     const hasChildren = item.children && item.children.length > 0;
+    const isExpanded = expandedFolderPaths.has(item.path);
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = hasChildren ? 'tree-toggle' : 'tree-toggle placeholder';
-    toggle.textContent = hasChildren && expandedFolderPaths.has(item.path) ? 'v' : '>';
+    toggle.setAttribute('aria-label', isExpanded ? 'Collapse folder' : 'Expand folder');
+    toggle.setAttribute('aria-expanded', String(isExpanded));
     toggle.disabled = !hasChildren;
-    toggle.title = hasChildren ? 'Expand folder' : '';
+    toggle.title = hasChildren ? (isExpanded ? 'Collapse folder' : 'Expand folder') : '';
+    toggle.append(createIcon('chevron'));
     toggle.addEventListener('click', () => {
       if (expandedFolderPaths.has(item.path)) {
         expandedFolderPaths.delete(item.path);
@@ -183,12 +264,23 @@ function appendItemRow(fragment, item, options = {}) {
       renderFolders(currentResults);
     });
 
+    const typeIcon = createIcon('folder');
+    typeIcon.classList.add('tree-type-icon');
+
     const label = document.createElement('span');
+    label.className = 'tree-label';
     label.textContent = item.name;
-    treeContent.append(toggle, label);
+    label.title = item.path;
+    treeContent.append(toggle, typeIcon, label);
     name.append(treeContent);
   } else {
-    name.textContent = item.name;
+    const itemLabel = document.createElement('div');
+    itemLabel.className = 'item-label';
+    itemLabel.append(createIcon(item.type === 'folder' ? 'folder' : 'file'));
+    const label = document.createElement('span');
+    label.textContent = item.name;
+    itemLabel.append(label);
+    name.append(itemLabel);
   }
 
   const size = document.createElement('td');
@@ -203,7 +295,7 @@ function appendItemRow(fragment, item, options = {}) {
   const actions = document.createElement('td');
   actions.className = 'actions-cell';
   actions.append(
-    createActionButton('Open', 'open', async () => {
+    createActionButton('Open', 'open', 'external', async () => {
       try {
         await window.diskAnalyser.showItem(item.path);
       } catch (error) {
@@ -214,7 +306,7 @@ function appendItemRow(fragment, item, options = {}) {
 
   if (!item.isRoot) {
     actions.append(
-      createActionButton('Delete', 'delete', async () => {
+      createActionButton('Delete', 'delete', 'trash', async () => {
         const confirmed = window.confirm(`Move this ${item.type} to the Recycle Bin?\n\n${item.path}`);
         if (!confirmed) {
           return;
@@ -271,7 +363,7 @@ function renderNestedFolders(items) {
     }
   };
 
-  for (const item of createFolderTree(items)) {
+  for (const item of createFolderTree(items, folderSortMode)) {
     appendNode(item, 0);
   }
 
@@ -286,12 +378,33 @@ function renderFolders(results) {
 
   elements.nestedFolderView.classList.toggle('active', folderViewMode === 'nested');
   elements.flatFolderView.classList.toggle('active', folderViewMode === 'flat');
+  elements.nestedFolderView.setAttribute('aria-checked', String(folderViewMode === 'nested'));
+  elements.flatFolderView.setAttribute('aria-checked', String(folderViewMode === 'flat'));
+  elements.folderSortSize.classList.toggle('active', folderSortMode === 'size');
+  elements.folderSortCreated.classList.toggle('active', folderSortMode === 'created');
+  elements.folderSortSize.setAttribute('aria-checked', String(folderSortMode === 'size'));
+  elements.folderSortCreated.setAttribute('aria-checked', String(folderSortMode === 'created'));
+
+  const sortedFolders = sortItems(results.folders, folderSortMode);
 
   if (folderViewMode === 'nested') {
-    renderNestedFolders(results.folders);
+    renderNestedFolders(sortedFolders);
   } else {
-    renderTable(elements.foldersBody, results.folders, 'No folders meet the minimum size.');
+    renderTable(elements.foldersBody, sortedFolders, 'No folders meet the minimum size.');
   }
+}
+
+function renderFiles(results) {
+  if (!results) {
+    renderEmpty(elements.filesBody, 'Select a path to scan.');
+    return;
+  }
+
+  elements.fileSortSize.classList.toggle('active', fileSortMode === 'size');
+  elements.fileSortCreated.classList.toggle('active', fileSortMode === 'created');
+  elements.fileSortSize.setAttribute('aria-checked', String(fileSortMode === 'size'));
+  elements.fileSortCreated.setAttribute('aria-checked', String(fileSortMode === 'created'));
+  renderTable(elements.filesBody, sortItems(results.files, fileSortMode), 'No files meet the minimum size.');
 }
 
 function removeItem(item) {
@@ -321,11 +434,13 @@ function renderResults(results) {
   elements.fileCount.textContent = results.files.length.toLocaleString();
   elements.folderCount.textContent = results.folders.length.toLocaleString();
   elements.skippedCount.textContent = results.totals.skipped.toLocaleString();
-  elements.folderSummary.textContent = `${results.folders.length.toLocaleString()} folders at or above minimum size`;
-  elements.fileSummary.textContent = `${results.files.length.toLocaleString()} files at or above minimum size`;
+  const folderSortLabel = folderSortMode === 'created' ? 'newest created first' : 'largest first';
+  const fileSortLabel = fileSortMode === 'created' ? 'newest created first' : 'largest first';
+  elements.folderSummary.textContent = `${results.folders.length.toLocaleString()} folders at or above minimum size, ${folderSortLabel}`;
+  elements.fileSummary.textContent = `${results.files.length.toLocaleString()} files at or above minimum size, ${fileSortLabel}`;
 
   renderFolders(results);
-  renderTable(elements.filesBody, results.files, 'No files meet the minimum size.');
+  renderFiles(results);
   elements.refreshList.disabled = isScanning || !currentResults;
 
   if (results.totals.errors.length) {
@@ -461,6 +576,10 @@ async function selectAndScan() {
 elements.selectPath.addEventListener('click', selectAndScan);
 elements.rescan.addEventListener('click', scanSelectedPath);
 elements.refreshList.addEventListener('click', refreshCurrentList);
+elements.themeToggle.addEventListener('click', () => {
+  const currentTheme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+  applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+});
 elements.cancelScan.addEventListener('click', async () => {
   await window.diskAnalyser.cancelScan();
   setScanning(false);
@@ -475,6 +594,42 @@ elements.nestedFolderView.addEventListener('click', () => {
 elements.flatFolderView.addEventListener('click', () => {
   folderViewMode = 'flat';
   renderFolders(currentResults);
+});
+
+elements.folderSortSize.addEventListener('click', () => {
+  folderSortMode = 'size';
+  if (currentResults) {
+    renderResults(currentResults);
+  } else {
+    renderFolders(currentResults);
+  }
+});
+
+elements.folderSortCreated.addEventListener('click', () => {
+  folderSortMode = 'created';
+  if (currentResults) {
+    renderResults(currentResults);
+  } else {
+    renderFolders(currentResults);
+  }
+});
+
+elements.fileSortSize.addEventListener('click', () => {
+  fileSortMode = 'size';
+  if (currentResults) {
+    renderResults(currentResults);
+  } else {
+    renderFiles(currentResults);
+  }
+});
+
+elements.fileSortCreated.addEventListener('click', () => {
+  fileSortMode = 'created';
+  if (currentResults) {
+    renderResults(currentResults);
+  } else {
+    renderFiles(currentResults);
+  }
 });
 
 function resetPanelSizes() {
@@ -514,6 +669,8 @@ elements.panelResizer.addEventListener('pointerdown', (event) => {
 window.diskAnalyser.onScanProgress(renderProgress);
 
 window.addEventListener('DOMContentLoaded', () => {
+  initializeTheme();
+  initializeButtonIcons();
   renderEmpty(elements.foldersBody, 'Select a path to scan.');
   renderEmpty(elements.filesBody, 'Select a path to scan.');
   setTimeout(selectAndScan, 350);

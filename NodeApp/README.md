@@ -8,6 +8,7 @@ Electron app source for the Disk Storage Analyser desktop tool. The app scans a 
 - Scan selected folders or drive roots such as `C:\`.
 - Separate folders and files tables sorted by descending size.
 - Nested and flat folder result modes.
+- Folder and file result sorting by size or newest created date.
 - Expandable folder tree for branch-level inspection.
 - Adjustable minimum-size filters for files and folders.
 - Live scan progress with current path, scanned counts, matches, and skipped items.
@@ -16,6 +17,7 @@ Electron app source for the Disk Storage Analyser desktop tool. The app scans a 
 - Move unwanted files or folders to the Recycle Bin.
 - Refresh the current results to remove items deleted outside the app.
 - Manually resizable folder and file panels.
+- Light and dark themes with a persistent theme toggle.
 
 ## Run
 

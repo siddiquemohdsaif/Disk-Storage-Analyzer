@@ -5,6 +5,10 @@ const path = require('node:path');
 let mainWindow;
 let scanId = 0;
 
+function createdTimestamp(stat) {
+  return stat.birthtimeMs || stat.ctimeMs || stat.mtimeMs || 0;
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1220,
@@ -130,6 +134,7 @@ ipcMain.handle('scan:path', async (_event, options) => {
         }
 
         if (entry.isDirectory()) {
+          const stat = await fs.stat(entryPath);
           const size = await walk(entryPath);
           folderSize += size;
 
@@ -138,6 +143,7 @@ ipcMain.handle('scan:path', async (_event, options) => {
               name: entry.name,
               path: entryPath,
               size,
+              createdAt: createdTimestamp(stat),
               type: 'folder'
             });
           }
@@ -155,6 +161,7 @@ ipcMain.handle('scan:path', async (_event, options) => {
               name: entry.name,
               path: entryPath,
               size: stat.size,
+              createdAt: createdTimestamp(stat),
               type: 'file'
             });
           }
@@ -178,6 +185,7 @@ ipcMain.handle('scan:path', async (_event, options) => {
       name: path.basename(rootPath) || rootPath,
       path: rootPath,
       size: rootSize,
+      createdAt: createdTimestamp(rootStat),
       type: 'folder',
       isRoot: true
     });

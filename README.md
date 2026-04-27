@@ -8,6 +8,7 @@ Disk Storage Analyser is a Windows-friendly Electron desktop app for finding the
 - Scan any selected directory, including drive roots such as `C:\`.
 - Separate ranked tables for folders and files.
 - Folder results can be viewed as a nested tree or a flat size-ranked list.
+- Folder and file results can sort by size or newest created date.
 - Expand folders in nested mode to inspect a selected branch.
 - Adjustable minimum-size filters for files and folders.
 - Live scan progress showing the current path, scanned counts, matches, and skipped items.
@@ -16,6 +17,7 @@ Disk Storage Analyser is a Windows-friendly Electron desktop app for finding the
 - Move files and folders to the Recycle Bin instead of deleting permanently.
 - Refresh the current result list to remove items deleted outside the app.
 - Resizable folder and file panels.
+- Light and dark themes with a persistent theme toggle.
 
 ## Project Structure
 

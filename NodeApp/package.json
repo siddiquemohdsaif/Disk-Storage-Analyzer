@@ -4,7 +4,9 @@
   "description": "A desktop UI for finding large files and folders on disk.",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "package:win": "powershell -ExecutionPolicy Bypass -File scripts/package-win.ps1",
+    "installer:win": "npm.cmd run package:win && powershell -ExecutionPolicy Bypass -File scripts/build-installer-win.ps1"
   },
   "keywords": [
     "disk",
