@@ -24,9 +24,24 @@ Disk Storage Analyser is a Windows-friendly Electron desktop app for finding the
 ```text
 .
 |-- README.md
+|-- WebApp
+|   |-- helper
+|   |   `-- server.cjs
+|   |-- index.html
+|   |-- package.json
+|   |-- scripts
+|   |   |-- open-web-app.ps1
+|   |   `-- web-static-server.cjs
+|   `-- src
+|       |-- App.jsx
+|       |-- main.jsx
+|       `-- styles.css
 `-- NodeApp
     |-- package.json
     |-- package-lock.json
+    |-- scripts
+    |   |-- build-installer-win.ps1
+    |   `-- package-win.ps1
     `-- src
         |-- index.html
         |-- main.js
@@ -50,6 +65,19 @@ npm.cmd start
 ```
 
 PowerShell may block the `npm` script shim on some Windows machines, so `npm.cmd` is used above.
+
+## Web Version With Local Helper
+
+This repo also includes a React web UI plus a local helper service. The browser talks to the helper on `http://127.0.0.1:37891` and receives live scan progress through a WebSocket. The helper owns native disk access: folder selection, scanning, File Explorer actions, and Recycle Bin deletes.
+
+```powershell
+cd WebApp
+.\open-web-app.bat
+```
+
+The web app, launcher, local helper, and web static server live in `WebApp`. `NodeApp` is kept for the Electron desktop app/exe. `WebApp/src/styles.css` imports the shared Electron UI stylesheet from `NodeApp/src/styles.css` and keeps only web-specific overrides locally.
+
+For a real hosted website, launch the helper with `DSA_ALLOWED_ORIGINS` set to your website origin so other websites cannot call it.
 
 ## Notes
 

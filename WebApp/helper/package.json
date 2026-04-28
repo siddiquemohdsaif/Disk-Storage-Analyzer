@@ -1,0 +1,11 @@
+{
+  "name": "disk-storage-analyser-helper",
+  "version": "1.0.0",
+  "description": "Local helper bridge for the hosted Disk Storage Analyser web UI.",
+  "main": "server.cjs",
+  "scripts": {
+    "start": "node server.cjs"
+  },
+  "license": "MIT",
+  "dependencies": {}
+}

@@ -28,6 +28,10 @@ npm.cmd start
 
 PowerShell may block the `npm` script shim on some Windows machines, so `npm.cmd` is used above.
 
+## Web UI
+
+The React web app and its localhost helper live in `..\WebApp`. `NodeApp` is kept for the Electron desktop app and Windows exe packaging.
+
 ## Source Layout
 
 ```text
@@ -37,4 +41,7 @@ src/
 |-- preload.js
 |-- renderer.js
 `-- styles.css
+scripts/
+|-- build-installer-win.ps1
+`-- package-win.ps1
 ```

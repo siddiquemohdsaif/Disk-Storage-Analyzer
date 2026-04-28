@@ -1,0 +1,23 @@
+{
+  "name": "disk-storage-analyser-web",
+  "version": "1.0.0",
+  "description": "React web UI for Disk Storage Analyser using a localhost helper bridge.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "helper:start": "node helper/server.cjs",
+    "serve:local": "node scripts/web-static-server.cjs",
+    "open": "powershell -ExecutionPolicy Bypass -File scripts/open-web-app.ps1"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "vite": "^7.1.12",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "lucide-react": "^0.468.0"
+  },
+  "devDependencies": {},
+  "license": "MIT"
+}
