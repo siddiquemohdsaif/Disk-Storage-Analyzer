@@ -11,7 +11,13 @@ npm.cmd install
 .\open-web-app.bat
 ```
 
-The launcher builds the React app, starts the helper on localhost, starts the static web server, generates a pairing token, and opens the browser already paired.
+The launcher builds the React app, starts the static web server, and opens the website. The website shows a Helper Launcher button when local disk support is not connected.
+
+To launch the website and helper together for development:
+
+```powershell
+.\open-web-app-with-helper.bat
+```
 
 ## Source Layout
 

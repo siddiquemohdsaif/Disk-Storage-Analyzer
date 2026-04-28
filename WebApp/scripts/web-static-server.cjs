@@ -37,6 +37,60 @@ function safeJoin(base, requestPath) {
 }
 
 const server = http.createServer((request, response) => {
+  const url = new URL(request.url, `http://${HOST}:${PORT}`);
+
+  if (url.pathname === '/download-helper.ps1' || url.pathname === '/download-helper.cmd') {
+    const token = url.searchParams.get('token') || '';
+    const helperPort = Number(url.searchParams.get('helperPort') || 37891);
+    const origin = url.searchParams.get('origin') || `http://${HOST}:${PORT}`;
+    const appDir = path.resolve(__dirname, '..');
+
+    if (url.pathname.endsWith('.ps1')) {
+      const safeAppDir = appDir.replace(/'/g, "''");
+      const safeToken = token.replace(/'/g, "''");
+      const safeOrigin = origin.replace(/'/g, "''");
+      const script = [
+        '$ErrorActionPreference = "Stop"',
+        `$env:DSA_HELPER_PORT = '${helperPort}'`,
+        `$env:DSA_HELPER_TOKEN = '${safeToken}'`,
+        `$env:DSA_ALLOWED_ORIGINS = '${safeOrigin}'`,
+        `Set-Location '${safeAppDir}'`,
+        'npm.cmd run helper:start'
+      ].join('\r\n');
+
+      send(response, 200, script, {
+        'content-type': 'text/plain; charset=utf-8',
+        'content-disposition': 'attachment; filename="start-disk-analyser-helper.ps1"'
+      });
+      return;
+    }
+
+    const safeAppDir = appDir.replace(/"/g, '""');
+    const safeToken = token.replace(/"/g, '');
+    const safeOrigin = origin.replace(/"/g, '');
+    const script = [
+      '@echo off',
+      'setlocal',
+      `set "DSA_HELPER_PORT=${helperPort}"`,
+      `set "DSA_HELPER_TOKEN=${safeToken}"`,
+      `set "DSA_ALLOWED_ORIGINS=${safeOrigin}"`,
+      `cd /d "${safeAppDir}"`,
+      'echo Starting Disk Storage Analyser helper...',
+      'echo Helper: http://127.0.0.1:%DSA_HELPER_PORT%',
+      'echo Keep this window open while using the website.',
+      'npm.cmd run helper:start',
+      'echo.',
+      'echo Helper stopped. Press any key to close.',
+      'pause > nul'
+    ].join('\r\n');
+
+    send(response, 200, script, {
+      'content-type': 'application/octet-stream',
+      'content-disposition': 'attachment; filename="start-disk-analyser-helper.cmd"'
+    });
+    return;
+  }
+
   if (!fs.existsSync(path.join(DIST_DIR, 'index.html'))) {
     send(response, 500, 'React build is missing. Run: npm.cmd run build from WebApp.', {
       'content-type': 'text/plain; charset=utf-8'

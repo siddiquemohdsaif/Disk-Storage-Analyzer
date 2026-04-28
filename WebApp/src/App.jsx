@@ -1,5 +1,6 @@
 import {
   ChevronRight,
+  Download,
   ExternalLink,
   File,
   Folder,
@@ -17,6 +18,12 @@ const DEFAULT_HELPER_URL = 'http://127.0.0.1:37891';
 
 function initialQuerySetting(name) {
   return new URLSearchParams(window.location.search).get(name);
+}
+
+function createToken() {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }
 
 function formatBytes(bytes) {
@@ -86,7 +93,7 @@ function createFolderTree(folders, sortMode) {
 
 function App() {
   const [helperUrl, setHelperUrl] = useState(initialQuerySetting('helperUrl') || localStorage.getItem('helperUrl') || DEFAULT_HELPER_URL);
-  const [token, setToken] = useState(initialQuerySetting('token') || localStorage.getItem('helperToken') || '');
+  const [token, setToken] = useState(initialQuerySetting('token') || localStorage.getItem('helperToken') || createToken());
   const [connection, setConnection] = useState('Disconnected');
   const [theme, setTheme] = useState(localStorage.getItem('diskAnalyserTheme') || 'light');
   const [notice, setNotice] = useState({ message: 'Start the local helper, then paste its pairing token.', type: 'info' });
@@ -160,6 +167,21 @@ function App() {
       setNotice({ message: error.message || 'Helper is not reachable on localhost.', type: 'error' });
     }
   };
+
+  const helperScriptUrl = useMemo(() => {
+    let port = '37891';
+    try {
+      port = new URL(helperUrl).port || '37891';
+    } catch {
+      port = '37891';
+    }
+    const params = new URLSearchParams({
+      token,
+      helperPort: port,
+      origin: window.location.origin
+    });
+    return `/download-helper.cmd?${params.toString()}`;
+  }, [helperUrl, token]);
 
   const selectAndScan = async () => {
     try {
@@ -409,15 +431,15 @@ function App() {
             </select>
           </div>
         </label>
-        <button className="button primary" type="button" disabled={!token || isScanning} onClick={selectAndScan}>
+        <button className="button primary" type="button" disabled={connection !== 'Connected' || isScanning} onClick={selectAndScan}>
           <FolderOpen size={17} />
           <span>Select Path</span>
         </button>
-        <button className="button" type="button" disabled={!currentPath || isScanning} onClick={() => scanSelectedPath()}>
+        <button className="button" type="button" disabled={connection !== 'Connected' || !currentPath || isScanning} onClick={() => scanSelectedPath()}>
           <ScanLine size={17} />
           <span>Scan</span>
         </button>
-        <button className="button" type="button" disabled={!results || isScanning} onClick={refreshList}>
+        <button className="button" type="button" disabled={connection !== 'Connected' || !results || isScanning} onClick={refreshList}>
           <RefreshCw size={17} />
           <span>Refresh</span>
         </button>
@@ -435,6 +457,19 @@ function App() {
       </section>
 
       {notice.message ? <section className={`notice ${notice.type}`}>{notice.message}</section> : null}
+
+      {connection !== 'Connected' ? (
+        <section className="helper-panel">
+          <div>
+            <strong>Local helper required</strong>
+            <span>Download and run the helper script, then click Connect. Keep its PowerShell window open.</span>
+          </div>
+          <a className="button primary" href={helperScriptUrl} download="start-disk-analyser-helper.cmd">
+            <Download size={17} />
+            <span>Helper Launcher</span>
+          </a>
+        </section>
+      ) : null}
 
       {isScanning && progress ? (
         <section className="progress-panel" aria-live="polite">

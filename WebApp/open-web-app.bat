@@ -1,6 +1,6 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\open-web-app.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\open-website.ps1"
 echo.
-echo Disk Storage Analyser launcher finished. Keep the helper and web server windows open.
+echo Disk Storage Analyser website launcher finished. Keep the web server window open.

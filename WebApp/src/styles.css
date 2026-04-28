@@ -42,6 +42,29 @@ body {
   background: var(--panel);
 }
 
+.helper-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex: 0 0 auto;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-radius: 8px;
+}
+
+.helper-panel div {
+  display: grid;
+  gap: 4px;
+}
+
+.helper-panel span {
+  font-size: 13px;
+}
+
 .tables {
   display: flex;
   flex-direction: column;
