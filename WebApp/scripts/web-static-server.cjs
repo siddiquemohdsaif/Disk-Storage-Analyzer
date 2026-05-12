@@ -39,6 +39,33 @@ function safeJoin(base, requestPath) {
 const server = http.createServer((request, response) => {
   const url = new URL(request.url, `http://${HOST}:${PORT}`);
 
+  if (url.pathname === '/download-helper.exe') {
+    const exePath = path.join(__dirname, '..', 'dist', 'native-light', 'disk_storage_analyzer-win32-x64', 'disk_storage_analyzer.exe');
+
+    if (!fs.existsSync(exePath)) {
+      send(response, 404, 'Helper EXE is not packaged yet. Run: npm.cmd run package:helper:win from WebApp.', {
+        'content-type': 'text/plain; charset=utf-8'
+      });
+      return;
+    }
+
+    const stat = fs.statSync(exePath);
+    response.writeHead(200, {
+      'cache-control': 'no-store',
+      'content-type': 'application/vnd.microsoft.portable-executable',
+      'content-disposition': 'attachment; filename="disk_storage_analyzer.exe"',
+      'content-length': stat.size
+    });
+
+    if (request.method === 'HEAD') {
+      response.end();
+      return;
+    }
+
+    fs.createReadStream(exePath).pipe(response);
+    return;
+  }
+
   if (url.pathname === '/download-helper.ps1' || url.pathname === '/download-helper.cmd') {
     const token = url.searchParams.get('token') || '';
     const helperPort = Number(url.searchParams.get('helperPort') || 37891);

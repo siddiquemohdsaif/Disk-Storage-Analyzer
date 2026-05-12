@@ -168,20 +168,7 @@ function App() {
     }
   };
 
-  const helperScriptUrl = useMemo(() => {
-    let port = '37891';
-    try {
-      port = new URL(helperUrl).port || '37891';
-    } catch {
-      port = '37891';
-    }
-    const params = new URLSearchParams({
-      token,
-      helperPort: port,
-      origin: window.location.origin
-    });
-    return `/download-helper.cmd?${params.toString()}`;
-  }, [helperUrl, token]);
+  const helperDownloadUrl = '/download-helper.exe';
 
   const selectAndScan = async () => {
     try {
@@ -462,11 +449,11 @@ function App() {
         <section className="helper-panel">
           <div>
             <strong>Local helper required</strong>
-            <span>Download and run the helper script, then click Connect. Keep its PowerShell window open.</span>
+            <span>Run disk_storage_analyzer.exe to start local disk support, then click Connect.</span>
           </div>
-          <a className="button primary" href={helperScriptUrl} download="start-disk-analyser-helper.cmd">
+          <a className="button primary" href={helperDownloadUrl} download="disk_storage_analyzer.exe">
             <Download size={17} />
-            <span>Helper Launcher</span>
+            <span>Helper EXE</span>
           </a>
         </section>
       ) : null}

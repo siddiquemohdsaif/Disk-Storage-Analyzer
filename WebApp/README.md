@@ -11,13 +11,29 @@ npm.cmd install
 .\open-web-app.bat
 ```
 
-The launcher builds the React app, starts the static web server, and opens the website. The website shows a Helper Launcher button when local disk support is not connected.
+The launcher builds the React app, starts the static web server, and opens the website. The website shows a Helper EXE button when local disk support is not connected.
 
 To launch the website and helper together for development:
 
 ```powershell
 .\open-web-app-with-helper.bat
 ```
+
+## Native Helper EXE
+
+Package the localhost helper shell:
+
+```powershell
+npm.cmd run package:helper:win
+```
+
+Output:
+
+```text
+dist\native-light\disk_storage_analyzer-win32-x64\disk_storage_analyzer.exe
+```
+
+This EXE is a lightweight native Windows Forms shell, not Electron. It starts the local helper, starts the local web server, opens the localhost website in the browser, and keeps a small status window open. It expects `node.exe` to be installed and available on `PATH`.
 
 ## Source Layout
 
@@ -29,7 +45,10 @@ WebApp/
 |   |-- open-web-app.ps1
 |   |-- start-helper-dev.ps1
 |   |-- start-web-dev.ps1
+|   |-- package-helper-win.ps1
 |   `-- web-static-server.cjs
+|-- native-light/
+|   `-- DiskStorageAnalyzerHelper.cs
 |-- src/
 |   |-- App.jsx
 |   |-- main.jsx

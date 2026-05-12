@@ -10,7 +10,8 @@
     "helper:start": "node helper/server.cjs",
     "serve:local": "node scripts/web-static-server.cjs",
     "open": "powershell -ExecutionPolicy Bypass -File scripts/open-website.ps1",
-    "open:with-helper": "powershell -ExecutionPolicy Bypass -File scripts/open-web-app.ps1"
+    "open:with-helper": "powershell -ExecutionPolicy Bypass -File scripts/open-web-app.ps1",
+    "package:helper:win": "powershell -ExecutionPolicy Bypass -File scripts/package-helper-win.ps1"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
